@@ -1,4 +1,8 @@
 
+// Modified in defaustok/reown-swift (2026-10-27): imports Foundation and guards the two UIApplication calls with
+// #if os(iOS), so WalletConnectSign builds for macOS. The change of reown-com/reown-swift#342, applied to 2.4.0.
+import Foundation
+
 #if os(iOS)
 import UIKit
 #endif
@@ -75,6 +79,7 @@ final class LinkEnvelopesDispatcher {
                 }
                 DispatchQueue.main.async { [weak self] in
                     self?.logger.debug("Will open universal link")
+#if os(iOS)
                     UIApplication.shared.open(envelopeUrl, options: [.universalLinksOnly: true]) { success in
                         if success {
                             continuation.resume(returning: ())
@@ -82,6 +87,13 @@ final class LinkEnvelopesDispatcher {
                             continuation.resume(throwing: Errors.failedToOpenUniversalLink(envelopeUrl.absoluteString))
                         }
                     }
+#else
+                    // Link Mode (universal-link transport) is an iOS-only concept: there is no
+                    // system API to hand a universal link to a peer app on macOS. Platforms
+                    // outside iOS fail this transport explicitly so callers fall back to the
+                    // relay transport, which this patch does not otherwise touch.
+                    continuation.resume(throwing: Errors.failedToOpenUniversalLink(envelopeUrl.absoluteString))
+#endif
                 }
             }
 
@@ -109,6 +121,7 @@ final class LinkEnvelopesDispatcher {
             }
             DispatchQueue.main.async { [unowned self] in
                 logger.debug("Will open universal link")
+#if os(iOS)
                 UIApplication.shared.open(envelopeUrl, options: [.universalLinksOnly: true]) { success in
                     if success {
                         continuation.resume(returning: ())
@@ -116,6 +129,11 @@ final class LinkEnvelopesDispatcher {
                         continuation.resume(throwing: Errors.failedToOpenUniversalLink(envelopeUrl.absoluteString))
                     }
                 }
+#else
+                // See the matching #else in request(...) above: Link Mode has no macOS
+                // equivalent, so it fails explicitly rather than referencing UIApplication.
+                continuation.resume(throwing: Errors.failedToOpenUniversalLink(envelopeUrl.absoluteString))
+#endif
             }
         }
 
